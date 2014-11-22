@@ -93,7 +93,7 @@ train_clean$cvtd_timestamp &lt;-as.double(train_clean$cvtd_timestamp)</code></pr
 </h2>
 </li>
 </ol>
-<p>I choose the method <em>Random Forests</em> to build the prediction model because of its high accuracy. But even the cleaned training data is very big so I have to sample from the observations. With the sampled data (of sample size 200). At first, I tried function <code>rfcv</code>, aiming to find the most important features in the model via cross-validation.</p>
+<p>I choose the method <em>Random Forests</em> to build the prediction model because of its high accuracy. But even the cleaned training data is very big so I have to sample from the observations. The size of the sampled data is 200. At first, I tried function <code>rfcv</code>, the random-forest-cross-validation function,  aiming to find the most important features in the model via cross-validation.</p>
 <pre class="r"><code>library(randomForest)</code></pre>
 <pre><code>## randomForest 4.6-10
 ## Type rfNews() to see new features/changes/bug fixes.</code></pre>
@@ -134,7 +134,7 @@ predict(modelFit,pmlTest)`</code></pre>
 </h2>
 </li>
 </ol>
-<p>I uploaded the prediction results to check, and got  17 predictions correct. The 3 problems with wrong answers are the 6th, 7th and 15th. I changed them to <code>E,D,E</code>, then 20 answers are all correct.</p>
+<p>I uploaded the prediction results to the course submission page, and got  17 predictions correct. The 3 problems with wrong answers are the 6th, 7th and 15th. I changed them to <code>E,D,E</code>, then 20 answers are all correct.</p>
 <h2>
 <ol start="5" style="list-style-type: decimal">
 <li>Reference
