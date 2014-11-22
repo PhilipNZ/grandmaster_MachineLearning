@@ -1,0 +1,90 @@
+---
+title: "Course Project for Practical Machine Learning"
+author: "Philip"
+date: "20/11/2014"
+output: html_document
+---
+<h2>Abstract</h2> Based on some human activity data collected from accelerometers, a machine learning model to predict the activity quality from activity monitors is set up and trained by `random forest` method and cross-validation approach. Then the model applies to the test data and yields some prediction with high accuracy.
+
+<h2>1. Background</h2>
+
+People do various activities to improve their health. Normally they quantify how much they do the activities, however, with some new devices such as Jawbone Up, Nike FuelBand, and Fitbit etc, people can also measure *how well* they do a particular activity. In this course project, we are asked to use the data collected from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. We are given two data-sets: training data and test data, that are avalaible at
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+and 
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+or the source [1].
+
+Our goal is to build a proper model to predict the manner in which they did the exercise. The manner is classified in the training data as classes A,B,C,D and E. We will train the model with the training data and test the model with the test data.
+
+<h2>2. Data Preparation</h2>
+
+Some quick exploration tells us that the data includes 160 variables with 19622 observations in the training data and 20 obeservations in test data, most of them are missing data. So we remove the missing data in the test data and then clean up the training data according to the test data. Our data now has 60 variables. Then convert the variable `cvtd_timestamp` to an appropriate format we can use directly in our model.
+```{r, echo=TRUE,eval=TRUE }
+library(caret)
+pmlTrain<-read.csv("./week3_assignment/pml-training.csv",na.strings=c("NA","na","#DIV/0!"))
+pmlTest<-read.csv("./week3_assignment/pml-testing.csv",na.strings=c("NA","na","#DIV/0!"))
+test_clean <- pmlTest[,colSums(is.na(pmlTest))<nrow(pmlTest)] #remove the NAs in the test dataset
+train_clean <- pmlTrain[,colSums(is.na(pmlTest))<nrow(pmlTest)]#remove the irrela info in the training dataset
+test_clean$cvtd_timestamp <-as.double(test_clean$cvtd_timestamp) # cvtd_timestamp converted 
+train_clean$cvtd_timestamp <-as.double(train_clean$cvtd_timestamp)
+```
+
+<h2>3. The Model with Cross-Validation</h2>
+
+I choose the method *Random Forests* to build the prediction model because of its high accuracy. But even the cleaned training data is very big so I have to sample from the observations. The size of the sampled data is 200. At first, I tried function `rfcv`, aiming to find the most important features in the model via cross-validation.
+```{r,echo=TRUE}
+library(randomForest)
+train_clean_s <- train_clean[sample(nrow(train_clean),size=200,replace=FALSE),] # randomly choose some observations
+result<-rfcv(train_clean_s[,1:59],train_clean_s[,60],cv.fold=5,scale="log",step=0.5)
+with(result, plot(n.var,error.cv, log="x", type="o", lwd=2))
+```
+
+The plot makes this approach quite promising, however, unfortunately, I could not figure out how to find the most important variables in the model by `rfcv`. So I have to do the cross validation manually as follows: I split the variables into 3 groups: X1:X20, X21:X40,X41:X59 and build the prediction model with outcome `classe`  and predictors of X1:X20, X21:X40 and X41:X59 respectively. Then rank the predictors according to their importance in the model. The following piece of code is about finding the important variables in X41:X59.
+```{r,echo=TRUE,eval=FALSE,results='hide'}
+modelFit1<-train(classe~accel_dumbbell_x +accel_dumbbell_y +accel_dumbbell_z+ magnet_dumbbell_x 
+                + magnet_dumbbell_y + magnet_dumbbell_z + roll_forearm + pitch_forearm 
+                + yaw_forearm + total_accel_forearm + gyros_forearm_x + gyros_forearm_y
+                + gyros_forearm_z + accel_forearm_x + accel_forearm_y + accel_forearm_z 
+                + magnet_forearm_x + magnet_forearm_y + magnet_forearm_z   
+                 ,method="rf",data=train_clean_s,importance=TRUE)
+varImp(modelFit1)
+```
+Then I chose the top 20 important predictors from X1:X59 and train the model with these 20 variables and rank them according to their importance.
+
+
+Now I have 20 most important predictors for the first sampling. I repeat the above process twice(which means got other two samplings), and obtain two sets of 20 most important predictors. Among these 3 sets of 20 predictors, I chose the most important 21 variables. Then train the model by
+```{r, echo=TRUE, eval=FALSE, results='hide'}
+train_clean_s <- train_clean[sample(nrow(train_clean),size=5000,replace=FALSE),] # randomly choose some observations
+modelFit<-train(classe~ accel_dumbbell_y + accel_arm_x + accel_arm_z + accel_belt_z 
+                 + accel_forearm_x + cvtd_timestamp + magnet_arm_x + magnet_arm_y 
+                 + magnet_belt_y + magnet_belt_z + magnet_dumbbell_z + magnet_dumbbell_y
+                 + magnet_dumbbell_x + num_window + pitch_forearm + pitch_belt
+                 + roll_belt + roll_forearm + raw_timestamp_part_1 + total_accel_arm
+                 + yaw_belt, method="rf", data=train_clean_s)
+predict(modelFit,pmlTest)`
+```
+
+With this training model, we can predict the classe for each record of the test data.
+
+
+I repeat the above model training and predictions for another two times. This is a sort of cross-validation of the model too. The predictions from the models trained by the 3 different samples are 
+```{r,echo=TRUE,eval=FALSE}
+##Sample 1
+ [1] B A B A A C D B A A B C B A E E A B B B
+## #Sample 2
+ [1] B A B A A E C B A B B C B A C E A B B B
+## #sample 3
+ [1] B A B A A C C B A A B C B A C E A B B B
+```
+That gives us the final prediction for the test data `B A B A A C C B A B C B A C E A B B B`, by the majority vote, with 16 preditions all the same for models trained by three different samples. That means the correct rate we can expect is about 16/20=80%.
+
+<h2>4. Results</h2>
+
+I uploaded the prediction results to the course webpage, and got 17 predictions correct. The 3 problems with wrong answers are the 6th, 7th and 15th. I changed them to `E,D,E`, then 20 answers are all correct.
+
+
+
+<h2>5. Reference</h2>
+
+[1] Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H.  *Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements.* Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6.  Read more: http://groupware.les.inf.puc-rio.br/har#ixzz3JkxjLFDA
+
